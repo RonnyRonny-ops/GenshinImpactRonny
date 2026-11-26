@@ -8,6 +8,10 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   };
 
+  const isAudio = (k) => k === 'music' || k === 'charm';
+  const KIND_LABEL = { music: 'ĐOÁN TÊN NHẠC', charm: 'NGHE NHẠC ĐOÁN NHÂN VẬT', burst: 'ĐOÁN CHIÊU NỘ' };
+  const KIND_Q = { music: 'Bài nhạc này tên là gì?', charm: 'Đây là nhạc nền của nhân vật nào?', burst: 'Đây là chiêu nộ của nhân vật nào?' };
+
   // ---------- identity ----------
   let playerId = store.get('gg.pid', null);
   if (!playerId) { playerId = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now()); store.set('gg.pid', playerId); }
@@ -154,7 +158,7 @@
       $('#set-mode').value = s.mode; $('#set-rounds').value = s.rounds; $('#set-music').value = s.musicTime;
       $('#set-burst').value = s.burstTime; $('#set-max').value = s.maxPlayers; $('#set-auto').checked = s.autoNext;
     }
-    $('#lib-counts').textContent = `Thư viện: ${st.counts.music} bài nhạc · ${st.counts.burst} ảnh chiêu nộ`;
+    $('#lib-counts').textContent = `Thư viện: ${st.counts.music} bài OST · ${st.counts.charm} nhạc nhân vật · ${st.counts.burst} ảnh chiêu nộ`;
     $('#btn-start').disabled = !st.playable;
     $('#lobby-err').textContent = st.playable ? '' : 'Chế độ này chưa có đủ nội dung (cần ít nhất 2 đáp án khác nhau).';
   }
@@ -227,7 +231,7 @@
   }
   function onYtError() {
     media.errored = true;
-    if (isHost && current && current.kind === 'music') socket.emit('media:error');
+    if (isHost && current && isAudio(current.kind)) socket.emit('media:error');
     $('#game-status').textContent = 'Không phát được bài này trên máy bạn.';
   }
   function prepareMusic(p) {
@@ -243,7 +247,7 @@
     yt.unMute(); yt.setVolume(volume); yt.playVideo();
     media.started = true;
     setTimeout(() => {
-      if (!current || current.kind !== 'music' || current.revealed) return;
+      if (!current || !isAudio(current.kind) || current.revealed) return;
       const st = yt.getPlayerState && yt.getPlayerState();
       if (st !== YT.PlayerState.PLAYING) $('#btn-unmute').classList.remove('hidden');
     }, 1800);
@@ -259,8 +263,8 @@
     myChoice = r.answered ? -1 : null;
     show('game');
     $('#round-label').textContent = `Vòng ${r.no}/${r.total}`;
-    $('#round-kind').textContent = r.kind === 'music' ? 'ĐOÁN NHẠC' : 'ĐOÁN CHIÊU NỘ';
-    $('#question').textContent = r.kind === 'music' ? 'Bài nhạc này tên là gì?' : 'Đây là chiêu nộ của nhân vật nào?';
+    $('#round-kind').textContent = KIND_LABEL[r.kind];
+    $('#question').textContent = KIND_Q[r.kind];
     $('#answered').textContent = '';
     $('#game-status').textContent = r.answered ? 'Bạn đã trả lời vòng này.' : '';
     $('#reveal-label').classList.add('hidden');
@@ -268,10 +272,10 @@
     $('#yt-wrap').classList.remove('reveal'); $('#yt-cover').classList.remove('hidden');
     const stage = $('#stage');
     stage.classList.toggle('kind-burst', r.kind === 'burst');
-    $('#music-viz').classList.toggle('hidden', r.kind !== 'music');
+    $('#music-viz').classList.toggle('hidden', !isAudio(r.kind));
     $('#music-viz').classList.remove('on');
     $('#burst-box').classList.toggle('hidden', r.kind !== 'burst');
-    if (r.kind === 'music') {
+    if (isAudio(r.kind)) {
       stopMedia(); prepareMusic(r.payload);
       if (ytApiFailed) $('#game-status').textContent = 'Trình duyệt chặn YouTube nên không phát được nhạc.';
     } else {
@@ -327,7 +331,7 @@
         fill.style.transform = `scaleX(${1 - p})`;
         fill.style.background = p > 0.75 ? 'linear-gradient(90deg,#ff8a96,#ffd678)' : '';
         setOptionsEnabled(myChoice === null && p < 1);
-        if (current.kind === 'music') {
+        if (isAudio(current.kind)) {
           $('#music-viz').classList.add('on');
           if (!media.want) { media.want = true; startMediaNow(); }
         } else {
@@ -429,6 +433,8 @@
   }
   function updateCounts() {
     $('#tab-music-count').textContent = library.music.length;
+    const nc = library.music.filter((t) => t.cat === 'char').length;
+    $('#music-split').textContent = `${library.music.length - nc} OST · ${nc} nhạc nhân vật`;
     $('#tab-burst-count').textContent = library.burst.length;
   }
 
@@ -443,7 +449,7 @@
     clearTimeout(saveTimer); await idbSet('library', library);
     if (isHost && myCode) {
       socket.emit('host:library', library, (res) => {
-        if (res && res.ok) toast(`Đã cập nhật thư viện phòng: ${res.counts.music} nhạc · ${res.counts.burst} ảnh`);
+        if (res && res.ok) toast(`Đã cập nhật thư viện phòng: ${res.counts.music} OST · ${res.counts.charm} nhạc nhân vật · ${res.counts.burst} ảnh`);
         else if (res) toast(res.error);
       });
     }
@@ -457,6 +463,17 @@
   }));
 
   // ----- music -----
+  // best guess at the character name from a theme / demo video title
+  function charName(t) {
+    const s = String(t || '');
+    const pats = [
+      /character\s*(?:demo|teaser|trailer)\s*[-–—:|]\s*["“”']?\s*([^"“”':|\-–—(]+?)\s*(?:[:"“”'|\-–—(]|$)/i,
+      /^\s*["“]?([^"“”:|\-–—(]{2,30}?)\s*[:]\s*/,
+      /^\s*([^\-–—|(]{2,30}?)'?s?\s+(?:theme|demo|teaser)\b/i,
+    ];
+    for (const p of pats) { const m = s.match(p); if (m && m[1].trim().length >= 2) return m[1].trim(); }
+    return cleanTitle(s);
+  }
   function cleanTitle(t) {
     let s = String(t || '');
     s = s.replace(/\[[^\]]*\]|【[^】]*】/g, ' ')
@@ -508,7 +525,8 @@
     $('#music-import').disabled = true;
     const ids = new Set(vids);
     for (const l of lists) { msg.textContent = 'Đang đọc playlist…'; (await playlistIds(l)).forEach((x) => ids.add(x)); }
-    const have = new Set(library.music.map((t) => t.id));
+    const catSel = $('#music-cat').value === 'char' ? 'char' : 'ost';
+    const have = new Set(library.music.filter((t) => (t.cat || 'ost') === catSel).map((t) => t.id));
     const fresh = [...ids].filter((x) => !have.has(x));
     if (!fresh.length) { msg.textContent = ids.size ? 'Các bài này đã có trong thư viện.' : 'Không đọc được bài nào từ link này.'; $('#music-import').disabled = false; return; }
     msg.textContent = `Đang lấy tên ${fresh.length} bài…`;
@@ -518,14 +536,16 @@
       if (res && res.items) items.push(...res.items);
     }
     let added = 0, blocked = 0;
-    for (const it of items) { if (it.ok && it.title) { library.music.push({ id: it.id, title: cleanTitle(it.title), orig: it.title }); added++; } else blocked++; }
+    const cat = $('#music-cat').value === 'char' ? 'char' : 'ost';
+    for (const it of items) { if (it.ok && it.title) { library.music.push({ id: it.id, title: cat === 'char' ? charName(it.title) : cleanTitle(it.title), orig: it.title, cat }); added++; } else blocked++; }
     msg.textContent = `Đã thêm ${added} bài${blocked ? ` · bỏ qua ${blocked} bài không cho phát nhúng` : ''}.`;
     $('#music-input').value = '';
     $('#music-import').disabled = false;
     saveLibrary(); renderMusicList();
   });
   $('#music-filter').addEventListener('input', renderMusicList);
-  $('#music-clean').addEventListener('click', () => { library.music.forEach((t) => { t.title = cleanTitle(t.orig || t.title); }); saveLibrary(); renderMusicList(); });
+  $('#music-view').addEventListener('change', renderMusicList);
+  $('#music-clean').addEventListener('click', () => { library.music.forEach((t) => { t.title = t.cat === 'char' ? charName(t.orig || t.title) : cleanTitle(t.orig || t.title); }); saveLibrary(); renderMusicList(); });
   $('#music-clear').addEventListener('click', () => { if (library.music.length && confirmInline('#music-clear', 'Bấm lần nữa để xoá hết')) { library.music = []; saveLibrary(); renderMusicList(); } });
   function confirmInline(sel, text) {
     const b = $(sel);
@@ -537,17 +557,23 @@
   function renderMusicList() {
     const ul = $('#music-list'); ul.textContent = '';
     const f = $('#music-filter').value.trim().toLowerCase();
-    const list = library.music.filter((t) => !f || t.title.toLowerCase().includes(f));
+    const view = $('#music-view').value;
+    const list = library.music.filter((t) => (view === 'all' || (t.cat || 'ost') === view) && (!f || t.title.toLowerCase().includes(f)));
     for (const t of list.slice(0, 400)) {
       const li = el('li');
       const im = el('img'); im.loading = 'lazy'; im.alt = ''; im.src = `https://i.ytimg.com/vi/${t.id}/mqdefault.jpg`;
-      const inp = el('input'); inp.value = t.title; inp.maxLength = 80; inp.setAttribute('aria-label', 'Tên bài');
+      const inp = el('input'); inp.value = t.title; inp.maxLength = 80; inp.setAttribute('aria-label', 'Đáp án');
+      inp.title = t.orig || '';
       inp.addEventListener('change', () => { t.title = inp.value.trim() || t.title; saveLibrary(); });
+      const sel = el('select', 'cat-sel'); sel.setAttribute('aria-label', 'Loại nhạc');
+      [['ost', 'OST'], ['char', 'Nhân vật']].forEach(([v, l]) => { const o = el('option', '', l); o.value = v; sel.append(o); });
+      sel.value = t.cat === 'char' ? 'char' : 'ost';
+      sel.addEventListener('change', () => { t.cat = sel.value; saveLibrary(); updateCounts(); });
       const del = el('button', 'del', '✕'); del.setAttribute('aria-label', 'Xoá bài');
       del.addEventListener('click', () => { library.music = library.music.filter((x) => x !== t); saveLibrary(); li.remove(); });
-      li.append(im, inp, del); ul.append(li);
+      li.append(im, inp, sel, del); ul.append(li);
     }
-    if (!library.music.length) ul.append(el('li', 'muted small', 'Chưa có bài nào. Dán link playlist YouTube OST Genshin ở trên nha.'));
+    if (!list.length) ul.append(el('li', 'muted small', library.music.length ? 'Không có bài nào khớp bộ lọc.' : 'Chưa có bài nào. Dán link playlist YouTube ở trên nha.'));
     updateCounts();
   }
 
@@ -616,8 +642,8 @@
       const lib = j.library || j;
       const m = Array.isArray(lib.music) ? lib.music.filter((t) => t && /^[\w-]{11}$/.test(t.id) && t.title) : [];
       const b = Array.isArray(lib.burst) ? lib.burst.filter((t) => t && t.name && typeof t.img === 'string' && (/^data:image\//.test(t.img) || /^https:\/\//.test(t.img))) : [];
-      const have = new Set(library.music.map((t) => t.id));
-      m.forEach((t) => { if (!have.has(t.id)) library.music.push({ id: t.id, title: String(t.title).slice(0, 80), orig: t.orig }); });
+      const have = new Set(library.music.map((t) => (t.cat === 'char' ? 'char' : 'ost') + t.id));
+      m.forEach((t) => { const cat = t.cat === 'char' ? 'char' : 'ost'; if (!have.has(cat + t.id)) library.music.push({ id: t.id, title: String(t.title).slice(0, 80), orig: t.orig, cat }); });
       b.forEach((t) => library.burst.push({ name: String(t.name).slice(0, 60), img: t.img }));
       saveLibrary(); renderMusicList(); renderBurstGrid();
       $('#backup-msg').textContent = `Đã nhập ${m.length} bài nhạc · ${b.length} ảnh.`;

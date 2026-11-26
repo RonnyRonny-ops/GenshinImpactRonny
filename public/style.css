@@ -168,3 +168,6 @@ body:not(.is-host) .host-only{display:none!important}
   .burst-add{grid-template-columns:1fr} .yt-wrap{width:150px;height:84px}
   .podium{gap:6px} .pod .nm{font-size:.9rem}
 }
+
+.lib-list .cat-sel{width:auto;padding:7px 8px;font-size:.82rem;flex:none}
+.view-sel{width:auto}

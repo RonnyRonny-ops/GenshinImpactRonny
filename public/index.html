@@ -67,7 +67,7 @@
       <div class="card host-only" id="host-panel">
         <p class="kicker">CÀI ĐẶT (CHỦ PHÒNG)</p>
         <label class="field"><span>Chế độ</span>
-          <select id="set-mode"><option value="music">Đoán nhạc OST</option><option value="burst">Đoán chiêu nộ</option><option value="mixed">Trộn cả hai</option></select>
+          <select id="set-mode"><option value="music">Đoán nhạc OST</option><option value="charm">Nghe nhạc đoán nhân vật</option><option value="burst">Đoán chiêu nộ</option><option value="mixed">Trộn cả hai</option></select>
         </label>
         <div class="row3">
           <label class="field"><span>Số vòng</span><input id="set-rounds" type="number" min="3" max="30" value="10"></label>
@@ -139,16 +139,18 @@
       <button class="icon-btn" id="lib-close" aria-label="Đóng">✕</button>
     </div>
     <div class="tabs" role="tablist">
-      <button class="tab active" data-tab="music" role="tab">Nhạc OST <span class="pill" id="tab-music-count">0</span></button>
+      <button class="tab active" data-tab="music" role="tab">Nhạc <span class="pill" id="tab-music-count">0</span></button>
       <button class="tab" data-tab="burst" role="tab">Chiêu nộ <span class="pill" id="tab-burst-count">0</span></button>
       <button class="tab" data-tab="backup" role="tab">Sao lưu</button>
     </div>
 
     <div class="tab-body" data-body="music">
-      <p class="muted small">Dán link <b>playlist</b> hoặc link <b>video</b> YouTube (mỗi dòng một link). App tự lấy tên bài, bài nào không cho phát nhúng sẽ tự bị bỏ qua. Bạn sửa lại tên cho gọn để làm đáp án.</p>
+      <p class="muted small">Dán link <b>playlist</b> hoặc link <b>video</b> YouTube (mỗi dòng một link). Chọn loại trước khi thêm:<br>
+      <b>Nhạc OST</b>: đáp án là <i>tên bài</i>. <b>Nhạc nhân vật</b> (character theme, nhạc Character Demo…): đáp án là <i>tên nhân vật</i>, app tự đoán tên từ tiêu đề video, bạn kiểm tra và sửa lại cho đúng.</p>
+      <label class="field"><span>Loại nhạc khi thêm</span><select id="music-cat"><option value="ost">Nhạc OST (đoán tên bài)</option><option value="char">Nhạc nhân vật (đoán nhân vật)</option></select></label>
       <textarea id="music-input" rows="3" placeholder="https://www.youtube.com/playlist?list=...&#10;https://youtu.be/..."></textarea>
       <div class="row-actions"><button class="btn primary small" id="music-import">Thêm vào thư viện</button><span id="music-msg" class="muted small"></span></div>
-      <div class="row-actions"><input id="music-filter" placeholder="Tìm bài…" class="grow"><button class="btn ghost small" id="music-clean">Làm gọn tên</button><button class="btn ghost small danger" id="music-clear">Xoá hết</button></div>
+      <div class="row-actions"><select id="music-view" class="view-sel" aria-label="Lọc theo loại"><option value="all">Tất cả</option><option value="ost">OST</option><option value="char">Nhân vật</option></select><span id="music-split" class="muted small"></span><input id="music-filter" placeholder="Tìm…" class="grow"><button class="btn ghost small" id="music-clean">Làm gọn tên</button><button class="btn ghost small danger" id="music-clear">Xoá hết</button></div>
       <ul id="music-list" class="lib-list"></ul>
     </div>
 
