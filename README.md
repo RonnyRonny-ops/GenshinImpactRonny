@@ -1,6 +1,6 @@
 # Genshin Guess · RonnyHarbinger
 
-Game đoán **nhạc OST** và **chiêu nộ** Genshin Impact, chơi real-time cùng người xem livestream.
+Game đoán **nhạc OST**, **nhạc nền nhân vật** và **chiêu nộ** Genshin Impact, chơi real-time cùng người xem livestream.
 Người chơi vào bằng link hoặc mã phòng 6 ký tự, không cần tài khoản.
 
 ---
@@ -34,6 +34,10 @@ Vào https://github.com và đăng ký tài khoản (miễn phí).
 
 Mở link game, bấm **Thư viện của tôi**.
 
+**Nhạc (tab Nhạc):** chọn **Loại nhạc khi thêm** trước:
+- *Nhạc OST*: đáp án là tên bài.
+- *Nhạc nhân vật* (character theme, nhạc Character Demo…): đáp án là tên nhân vật. App tự đoán tên nhân vật từ tiêu đề video; bạn kiểm tra lại và có thể đổi sang tên tiếng Việt cho quen thuộc (VD: Băng Thần).
+
 **Nhạc OST:**
 - Lên YouTube tìm playlist OST Genshin, copy link playlist (có `list=` trong link), dán vào ô rồi bấm **Thêm vào thư viện**.
 - App tự lấy tên bài. Bài nào YouTube không cho phát trên web khác sẽ bị bỏ qua.
@@ -52,7 +56,7 @@ Thư viện được lưu trên **trình duyệt bạn đang dùng**. Vào tab *
 ## 3. Lên live
 
 1. Mở link game trên máy tính, nhập tên, bấm **Tạo phòng mới**.
-2. Chọn chế độ: **Đoán nhạc OST**, **Đoán chiêu nộ** hoặc **Trộn cả hai**. Chỉnh số vòng và số giây.
+2. Chọn chế độ: **Đoán nhạc OST**, **Nghe nhạc đoán nhân vật**, **Đoán chiêu nộ** hoặc **Trộn cả hai**. Chỉnh số vòng và số giây.
 3. Trong OBS hoặc TikTok Live Studio, thêm cửa sổ trình duyệt này (Window Capture). Màn hình có sẵn **mã phòng**, **mã QR** và **bảng xếp hạng**.
 4. Người xem quét QR hoặc vào link, nhập mã phòng và tên. Họ chơi ngay trên điện thoại.
 5. Bấm **Bắt đầu**.

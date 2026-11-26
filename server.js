@@ -1,5 +1,5 @@
 // RonnyHarbinger · Genshin Guess — real-time guessing game server
-// Modes: "music" (guess the OST from a YouTube clip) and "burst" (guess the character from a burst image)
+// Modes: "music" (guess the OST title), "charm" (guess the character from their theme music), "burst" (guess the character from a burst image)
 const path = require('path');
 const http = require('http');
 const express = require('express');
@@ -36,7 +36,9 @@ function newCode() {
   return c;
 }
 
-const PREP_MS = { music: 3500, burst: 2500 };
+const PREP_MS = { music: 3500, charm: 3500, burst: 2500 };
+const KINDS = ['music', 'charm', 'burst'];
+const isAudio = (k) => k === 'music' || k === 'charm';
 const REVEAL_MS = 7000;
 const MAX_PLAYERS_CAP = 100;
 
@@ -44,7 +46,7 @@ const MAX_PLAYERS_CAP = 100;
 const rooms = new Map();
 
 function sanitizeSettings(s = {}, prev = {}) {
-  const mode = ['music', 'burst', 'mixed'].includes(s.mode) ? s.mode : (prev.mode || 'music');
+  const mode = ['music', 'charm', 'burst', 'mixed'].includes(s.mode) ? s.mode : (prev.mode || 'music');
   return {
     mode,
     rounds: clampInt(s.rounds, 3, 30, prev.rounds || 10),
@@ -61,10 +63,12 @@ function sanitizeLibrary(lib = {}) {
   const m = [];
   const seen = new Set();
   for (const t of music.slice(0, 600)) {
-    if (!t || !YT_ID.test(t.id) || seen.has(t.id)) continue;
+    if (!t || !YT_ID.test(t.id)) continue;
+    const cat = t.cat === 'char' ? 'char' : 'ost';
+    if (seen.has(cat + t.id)) continue;
     const title = cleanLabel(t.title);
     if (!title) continue;
-    seen.add(t.id); m.push({ id: t.id, title });
+    seen.add(cat + t.id); m.push({ id: t.id, title, cat });
   }
   const b = [];
   for (const it of burst.slice(0, 300)) {
@@ -85,15 +89,19 @@ function publicPlayers(room) {
 function leaderboard(room) {
   return publicPlayers(room).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 }
+function itemsOf(room, kind) {
+  if (kind === 'burst') return room.library.burst;
+  return room.library.music.filter((t) => (kind === 'charm' ? t.cat === 'char' : t.cat !== 'char'));
+}
+const labelOf = (kind, item) => (kind === 'burst' ? item.name : item.title);
 function distinctLabels(room, kind) {
-  const src = kind === 'music' ? room.library.music.map((t) => t.title) : room.library.burst.map((t) => t.name);
-  return [...new Set(src)];
+  return [...new Set(itemsOf(room, kind).map((t) => labelOf(kind, t)))];
 }
 function kindsAvailable(room) {
-  const k = [];
-  if (room.library.music.length >= 1 && distinctLabels(room, 'music').length >= 2) k.push('music');
-  if (room.library.burst.length >= 1 && distinctLabels(room, 'burst').length >= 2) k.push('burst');
-  return k;
+  return KINDS.filter((k) => itemsOf(room, k).length >= 1 && distinctLabels(room, k).length >= 2);
+}
+function counts(room) {
+  return { music: itemsOf(room, 'music').length, charm: itemsOf(room, 'charm').length, burst: room.library.burst.length };
 }
 function modeKinds(room) {
   const av = kindsAvailable(room);
@@ -111,7 +119,7 @@ function roomState(room) {
     state: room.state,
     roundNo: room.roundNo,
     total: room.settings.rounds,
-    counts: { music: room.library.music.length, burst: room.library.burst.length },
+    counts: counts(room),
     playable: modeKinds(room).length > 0,
   };
 }
@@ -130,14 +138,14 @@ function startGame(room) {
   clearTimers(room);
   for (const p of room.players.values()) { p.score = 0; p.streak = 0; }
   room.roundNo = 0;
-  room.used = { music: new Set(), burst: new Set() };
+  room.used = { music: new Set(), charm: new Set(), burst: new Set() };
   room.history = [];
   nextRound(room);
   return null;
 }
 
 function pickItem(room, kind) {
-  const list = kind === 'music' ? room.library.music : room.library.burst;
+  const list = itemsOf(room, kind);
   let pool = list.map((_, i) => i).filter((i) => !room.used[kind].has(i) && !(room.failed && room.failed.has(kind + i)));
   if (!pool.length) { room.used[kind].clear(); pool = list.map((_, i) => i).filter((i) => !(room.failed && room.failed.has(kind + i))); }
   if (!pool.length) return null;
@@ -158,15 +166,15 @@ function nextRound(room, { reroll = false } = {}) {
   if (idx === null) { kind = kinds.find((k) => k !== kind); idx = kind ? pickItem(room, kind) : null; }
   if (idx === null) return endGame(room);
 
-  const item = kind === 'music' ? room.library.music[idx] : room.library.burst[idx];
-  const correct = kind === 'music' ? item.title : item.name;
+  const item = itemsOf(room, kind)[idx];
+  const correct = labelOf(kind, item);
   const others = shuffle(distinctLabels(room, kind).filter((l) => l !== correct)).slice(0, 3);
   const options = shuffle([correct, ...others]);
-  const limitMs = (kind === 'music' ? room.settings.musicTime : room.settings.burstTime) * 1000;
+  const limitMs = (isAudio(kind) ? room.settings.musicTime : room.settings.burstTime) * 1000;
   const playAt = now() + PREP_MS[kind];
   room.round = {
     kind, idx, options, answerIndex: options.indexOf(correct), correct,
-    payload: kind === 'music' ? { videoId: item.id, startFrac: 0.15 + Math.random() * 0.5 } : { img: item.img, zoomX: 0.25 + Math.random() * 0.5, zoomY: 0.25 + Math.random() * 0.5 },
+    payload: isAudio(kind) ? { videoId: item.id, startFrac: 0.15 + Math.random() * 0.5 } : { img: item.img, zoomX: 0.25 + Math.random() * 0.5, zoomY: 0.25 + Math.random() * 0.5 },
     playAt, endsAt: playAt + limitMs, limitMs, answers: new Map(), revealed: false,
   };
   room.state = 'play';
@@ -193,14 +201,14 @@ function reveal(room) {
     results.push({ id: p.id, name: p.name, choice: a ? a.choice : null, correct: !!(a && a.correct), points: a && a.correct ? a.points + Math.min(200, 50 * (p.streak - 1)) : 0, ms: a ? a.ms : null });
   }
   results.sort((a, b) => (b.correct - a.correct) || ((a.ms ?? 1e9) - (b.ms ?? 1e9)));
-  const item = r.kind === 'music' ? room.library.music[r.idx] : room.library.burst[r.idx];
+  const item = itemsOf(room, r.kind)[r.idx];
   room.history.push({ kind: r.kind, label: r.correct });
   room.state = 'reveal';
   const last = room.roundNo >= room.settings.rounds;
   const nextAt = room.settings.autoNext ? now() + REVEAL_MS : null;
   io.to(room.code).emit('reveal', {
     no: room.roundNo, total: room.settings.rounds, kind: r.kind, answerIndex: r.answerIndex, label: r.correct,
-    videoId: r.kind === 'music' ? item.id : null, results, leaderboard: leaderboard(room), last, nextAt, serverNow: now(),
+    videoId: isAudio(r.kind) ? item.id : null, results, leaderboard: leaderboard(room), last, nextAt, serverNow: now(),
   });
   broadcastState(room);
   if (room.settings.autoNext) later(room, REVEAL_MS, () => (last ? endGame(room) : nextRound(room)));
@@ -273,7 +281,7 @@ io.on('connection', (socket) => {
     const r = {
       code, hostId: pid, players: new Map(), settings: sanitizeSettings(data.settings),
       library: sanitizeLibrary(data.library), state: 'lobby', roundNo: 0, round: null, timers: [],
-      used: { music: new Set(), burst: new Set() }, history: [], failed: new Set(), createdAt: now(), emptySince: null,
+      used: { music: new Set(), charm: new Set(), burst: new Set() }, history: [], failed: new Set(), createdAt: now(), emptySince: null,
     };
     rooms.set(code, r);
     const p = { id: pid, name, score: 0, streak: 0, connected: true, socketId: socket.id };
@@ -323,7 +331,7 @@ io.on('connection', (socket) => {
     if (!isHost()) return fail(cb, 'Chỉ chủ phòng mới đổi được thư viện.');
     if (room.state === 'play' || room.state === 'reveal') return fail(cb, 'Đợi hết ván rồi đổi thư viện nha.');
     room.library = sanitizeLibrary(lib); room.failed = new Set();
-    broadcastState(room); cb && cb({ ok: true, counts: { music: room.library.music.length, burst: room.library.burst.length } });
+    broadcastState(room); cb && cb({ ok: true, counts: counts(room) });
   });
   socket.on('host:start', (cb) => {
     if (!isHost()) return fail(cb, 'Chỉ chủ phòng mới bắt đầu được.');
@@ -349,9 +357,9 @@ io.on('connection', (socket) => {
 
   socket.on('media:error', () => {
     // only the host's player decides a clip can't be played (avoids trolling)
-    if (!isHost() || room.state !== 'play' || !room.round || room.round.kind !== 'music') return;
+    if (!isHost() || room.state !== 'play' || !room.round || !isAudio(room.round.kind)) return;
     if (now() > room.round.playAt + 4000) return;
-    room.failed.add('music' + room.round.idx);
+    room.failed.add(room.round.kind + room.round.idx);
     io.to(room.code).emit('toast', 'Bài này không phát được trên YouTube, đổi bài khác…');
     nextRound(room, { reroll: true });
   });
