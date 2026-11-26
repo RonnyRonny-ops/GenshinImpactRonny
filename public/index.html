@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Genshin Guess · RonnyHarbinger</title>
+<meta name="description" content="Đoán nhạc OST và chiêu nộ Genshin Impact cùng RonnyHarbinger">
+<meta name="theme-color" content="#071530">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23cdf2ff'/%3E%3Cpath d='M32 10l6 16 16 6-16 6-6 16-6-16-16-6 16-6z' fill='%231e468c'/%3E%3C/svg%3E">
+</head>
+<body>
+<div id="snow" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand"><span class="emblem" aria-hidden="true"></span><span>RONNYHARBINGER</span></div>
+  <div class="topbar-right">
+    <label class="vol" title="Âm lượng"><span aria-hidden="true">♪</span><input id="volume" type="range" min="0" max="100" value="70" aria-label="Âm lượng"></label>
+    <span id="conn" class="conn" title="Kết nối"></span>
+  </div>
+</header>
+
+<main id="app">
+
+  <!-- HOME -->
+  <section id="view-home" class="view">
+    <div class="hero">
+      <p class="kicker">GENSHIN IMPACT · CHƠI CÙNG STREAM</p>
+      <h1>Genshin <span>Guess</span></h1>
+      <p class="sub">Nghe nhạc đoán tên OST · Nhìn chiêu nộ đoán nhân vật</p>
+    </div>
+    <div class="card home-card">
+      <label class="field"><span>Tên của bạn</span><input id="home-name" maxlength="18" placeholder="VD: Ronny" autocomplete="nickname"></label>
+      <div class="split">
+        <div class="pane">
+          <h3>Vào phòng</h3>
+          <input id="home-code" class="code-input" maxlength="6" placeholder="MÃ PHÒNG" autocomplete="off" autocapitalize="characters">
+          <button id="btn-join" class="btn primary">Vào chơi</button>
+        </div>
+        <div class="pane">
+          <h3>Tạo phòng</h3>
+          <p class="muted small">Dành cho streamer. Chuẩn bị thư viện nhạc / chiêu nộ trước khi tạo phòng.</p>
+          <button id="btn-create" class="btn gold">Tạo phòng mới</button>
+          <button id="btn-library-home" class="btn ghost">Thư viện của tôi</button>
+        </div>
+      </div>
+      <p id="home-err" class="err" role="alert"></p>
+    </div>
+  </section>
+
+  <!-- LOBBY -->
+  <section id="view-lobby" class="view hidden">
+    <div class="lobby-grid">
+      <div class="card">
+        <p class="kicker">PHÒNG CHỜ</p>
+        <div class="room-code-row">
+          <div><span class="muted small">Mã phòng</span><div class="room-code" id="lobby-code">------</div></div>
+          <button class="btn ghost small" id="btn-copy-link">Copy link mời</button>
+        </div>
+        <div class="players-head"><h3>Người chơi <span id="lobby-count" class="pill">0</span></h3></div>
+        <ul id="lobby-players" class="players"></ul>
+        <p id="lobby-wait" class="muted center">Chờ chủ phòng bắt đầu…</p>
+      </div>
+      <div class="card host-only" id="host-panel">
+        <p class="kicker">CÀI ĐẶT (CHỦ PHÒNG)</p>
+        <label class="field"><span>Chế độ</span>
+          <select id="set-mode"><option value="music">Đoán nhạc OST</option><option value="burst">Đoán chiêu nộ</option><option value="mixed">Trộn cả hai</option></select>
+        </label>
+        <div class="row3">
+          <label class="field"><span>Số vòng</span><input id="set-rounds" type="number" min="3" max="30" value="10"></label>
+          <label class="field"><span>Giây / nhạc</span><input id="set-music" type="number" min="8" max="30" value="15"></label>
+          <label class="field"><span>Giây / chiêu nộ</span><input id="set-burst" type="number" min="6" max="30" value="12"></label>
+        </div>
+        <div class="row2">
+          <label class="field"><span>Tối đa người chơi</span><input id="set-max" type="number" min="2" max="100" value="50"></label>
+          <label class="check"><input id="set-auto" type="checkbox" checked> Tự sang vòng tiếp</label>
+        </div>
+        <div class="lib-summary"><span id="lib-counts">Thư viện: 0 bài nhạc · 0 ảnh chiêu nộ</span><button class="btn ghost small" id="btn-library-lobby">Sửa thư viện</button></div>
+        <p id="lobby-err" class="err" role="alert"></p>
+        <button id="btn-start" class="btn gold big">Bắt đầu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- GAME -->
+  <section id="view-game" class="view hidden">
+    <div class="game-grid">
+      <div class="card game-main">
+        <div class="round-head">
+          <span id="round-label" class="pill">Vòng 1/10</span>
+          <span id="round-kind" class="kind">Đoán nhạc</span>
+          <span id="answered" class="muted small"></span>
+        </div>
+        <div class="timebar"><div id="timebar-fill"></div></div>
+        <div class="stage" id="stage">
+          <div class="music-viz" id="music-viz" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="burst-box hidden" id="burst-box"><img id="burst-img" alt="Ảnh chiêu nộ cần đoán"></div>
+          <div class="yt-wrap" id="yt-wrap"><div id="yt-player"></div><div class="yt-cover" id="yt-cover">?</div></div>
+          <div class="countdown hidden" id="countdown">3</div>
+          <div class="reveal-label hidden" id="reveal-label"></div>
+          <button class="btn gold hidden" id="btn-unmute">Bấm để bật âm thanh</button>
+        </div>
+        <p class="question" id="question">Bài nhạc này tên là gì?</p>
+        <div class="options" id="options"></div>
+        <p id="game-status" class="muted center small"></p>
+        <div class="host-only host-controls">
+          <button class="btn ghost small" id="btn-next">Bỏ qua / Tiếp</button>
+          <button class="btn ghost small" id="btn-lobby">Về phòng chờ</button>
+        </div>
+      </div>
+      <aside class="card side">
+        <div class="side-code"><span class="muted small">Vào chơi tại</span><div class="room-code sm" id="side-code">------</div><div id="side-qr" class="qr"></div><div class="muted xsmall" id="side-url"></div></div>
+        <h3>Bảng xếp hạng</h3>
+        <ol id="leaderboard" class="board"></ol>
+      </aside>
+    </div>
+  </section>
+
+  <!-- END -->
+  <section id="view-end" class="view hidden">
+    <div class="card end-card">
+      <p class="kicker">KẾT QUẢ CHUNG CUỘC</p>
+      <div class="podium" id="podium"></div>
+      <ol id="final-board" class="board"></ol>
+      <div class="host-only end-actions"><button class="btn gold" id="btn-again">Chơi lại</button><button class="btn ghost" id="btn-end-lobby">Về phòng chờ</button></div>
+      <p class="muted center small not-host">Chờ chủ phòng bắt đầu ván mới…</p>
+    </div>
+  </section>
+</main>
+
+<!-- LIBRARY MODAL -->
+<div id="library" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="lib-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2 id="lib-title">Thư viện</h2>
+      <button class="icon-btn" id="lib-close" aria-label="Đóng">✕</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="music" role="tab">Nhạc OST <span class="pill" id="tab-music-count">0</span></button>
+      <button class="tab" data-tab="burst" role="tab">Chiêu nộ <span class="pill" id="tab-burst-count">0</span></button>
+      <button class="tab" data-tab="backup" role="tab">Sao lưu</button>
+    </div>
+
+    <div class="tab-body" data-body="music">
+      <p class="muted small">Dán link <b>playlist</b> hoặc link <b>video</b> YouTube (mỗi dòng một link). App tự lấy tên bài, bài nào không cho phát nhúng sẽ tự bị bỏ qua. Bạn sửa lại tên cho gọn để làm đáp án.</p>
+      <textarea id="music-input" rows="3" placeholder="https://www.youtube.com/playlist?list=...&#10;https://youtu.be/..."></textarea>
+      <div class="row-actions"><button class="btn primary small" id="music-import">Thêm vào thư viện</button><span id="music-msg" class="muted small"></span></div>
+      <div class="row-actions"><input id="music-filter" placeholder="Tìm bài…" class="grow"><button class="btn ghost small" id="music-clean">Làm gọn tên</button><button class="btn ghost small danger" id="music-clear">Xoá hết</button></div>
+      <ul id="music-list" class="lib-list"></ul>
+    </div>
+
+    <div class="tab-body hidden" data-body="burst">
+      <p class="muted small">Thêm ảnh chụp chiêu nộ (Q) của từng nhân vật. Một nhân vật có thể có nhiều ảnh. Ảnh được nén nhỏ và chỉ lưu trên trình duyệt này; khi bạn tạo phòng, ảnh được gửi tới người chơi theo từng vòng.</p>
+      <div class="burst-add">
+        <label class="field"><span>Tên nhân vật (đáp án)</span><input id="burst-name" maxlength="60" placeholder="VD: Băng Thần" list="burst-names"></label>
+        <datalist id="burst-names"></datalist>
+        <label class="field"><span>Ảnh từ máy</span><input id="burst-files" type="file" accept="image/*" multiple></label>
+        <label class="field"><span>…hoặc link ảnh (https)</span><input id="burst-url" placeholder="https://..."></label>
+        <button class="btn primary small" id="burst-add">Thêm ảnh</button>
+        <span id="burst-msg" class="muted small"></span>
+      </div>
+      <div id="burst-grid" class="burst-grid"></div>
+    </div>
+
+    <div class="tab-body hidden" data-body="backup">
+      <p class="muted small">Xuất thư viện ra file để lưu dự phòng, chuyển sang máy khác, hoặc gửi cho bạn bè dùng chung.</p>
+      <div class="row-actions"><button class="btn primary small" id="lib-export">Xuất file thư viện</button>
+      <label class="btn ghost small file-btn">Nhập file thư viện<input id="lib-import" type="file" accept="application/json,.json" hidden></label></div>
+      <p id="backup-msg" class="muted small"></p>
+    </div>
+
+    <div class="modal-foot"><span class="muted small" id="lib-sync"></span><button class="btn gold" id="lib-done">Xong</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden" role="status"></div>
+<div id="yt-probe" class="probe" aria-hidden="true"><div id="yt-probe-player"></div></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
