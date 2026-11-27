@@ -610,6 +610,9 @@
     msg.textContent = `Đã thêm ${n} ảnh cho ${name}.`;
     saveLibrary(); renderBurstGrid();
   });
+  $('#burst-clear').addEventListener('click', () => {
+    if (library.burst.length && confirmInline('#burst-clear', 'Bấm lần nữa để xoá hết')) { library.burst = []; saveLibrary(); renderBurstGrid(); }
+  });
   function renderBurstGrid() {
     const g = $('#burst-grid'); g.textContent = '';
     const names = [...new Set(library.burst.map((b) => b.name))];
@@ -625,6 +628,7 @@
       foot.append(inp, del); c.append(im, foot); g.append(c);
     });
     if (!library.burst.length) g.append(el('p', 'muted small', 'Chưa có ảnh nào. Cần ít nhất 2 nhân vật khác nhau để chơi.'));
+    $('#burst-split').textContent = library.burst.length ? `${library.burst.length} ảnh · ${names.length} nhân vật` : '';
     updateCounts();
   }
 
